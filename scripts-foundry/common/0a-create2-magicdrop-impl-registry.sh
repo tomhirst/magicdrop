@@ -1,50 +1,87 @@
 #!/bin/bash
 
-if [ -f .env ]
-then
-  export $(grep -v '^#' .env | xargs)
-else
-    echo "Please set your .env file"
-    exit 1
-fi
+get_magicdrop_registry_address() {
+    local INITIAL_OWNER="$1"
+    if [ -z "$INITIAL_OWNER" ]; then
+        echo "Usage: get_magicdrop_registry_address <initial-owner-address>" >&2
+        return 1
+    fi
 
+    # NOTE: If you change the number of optimizer runs, you must also change the number in the deploy script,
+    # otherwise the CREATE2 address will be different.
+    local registryByteCode
+    registryByteCode="$(forge inspect contracts/registry/MagicDropTokenImplRegistry.sol:MagicDropTokenImplRegistry bytecode --optimizer-runs 777 --via-ir)"
 
-INITIAL_OWNER=""
+    # # Encode the constructor arguments
+    # local constructorArgs
+    # constructorArgs="$(cast abi-encode "constructor(address)" "$INITIAL_OWNER")"
+    # # Remove the '0x' prefix from the encoded constructor arguments
+    # local constructorArgsNoPrefix=${constructorArgs#0x}
 
-# Function to display usage
+    # # Concatenate the bytecode and constructor arguments to construct the init code
+    # local registryInitCode
+    # registryInitCode="$(cast concat-hex "$registryByteCode" "$constructorArgsNoPrefix")"
+
+    # Compute the expected CREATE2 address and parse the output
+    local create2_output
+    create2_output="$(cast create2 --starts-with 0000 --case-sensitive --init-code "$registryByteCode")"
+    
+    # Extract salt and address using regex and set them as global variables
+    if [[ $create2_output =~ Address:\ (0x[0-9a-fA-F]+).*Salt:\ (0x[0-9a-fA-F]+) ]]; then
+        REGISTRY_ADDRESS="${BASH_REMATCH[1]}"
+        REGISTRY_SALT="${BASH_REMATCH[2]}"
+    else
+        echo "Error: Failed to parse CREATE2 output: $create2_output" >&2
+        return 1
+    fi
+}
+
+# Function to display usage information
 usage() {
-    echo "Usage: $0 --initial-owner <initial owner address>"
+    echo "Usage: $0 --run --initial-owner <initial owner address>"
     exit 1
 }
 
-# Process arguments
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --initial-owner) INITIAL_OWNER=$2; shift ;;
-        *) usage ;;
-    esac
-    shift
-done
+# Main run function that processes arguments and calls get_magicdrop_registry_address
+run() {
+    local INITIAL_OWNER=""
+    # Declare global variables
+    REGISTRY_SALT=""
+    REGISTRY_ADDRESS=""
 
-if [ -z "$INITIAL_OWNER" ]; then
-    usage
+    # Process arguments for run function
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --initial-owner)
+                INITIAL_OWNER="$2"
+                shift ;;
+            *)
+                usage ;;
+        esac
+        shift
+    done
+
+    if [ -z "$INITIAL_OWNER" ]; then
+        usage
+    fi
+
+    if ! get_magicdrop_registry_address "$INITIAL_OWNER"; then
+        echo "Error: Failed to compute registry address" >&2
+        exit 1
+    fi
+    
+    # Now you can use REGISTRY_SALT and REGISTRY_ADDRESS here
+    echo ""
+    echo "MagicDropImplRegistry"
+    echo "Salt: $REGISTRY_SALT"
+    echo "Address: $REGISTRY_ADDRESS"
+    echo ""
+}
+
+# When running this script directly with --run, invoke the run function.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if [[ "$1" == "--run" ]]; then
+        shift
+        run "$@"
+    fi
 fi
-
-# NOTE: If you change the number of optimizer runs, you must also change the number in the deploy script, otherwise the CREATE2 address will be different
-
-echo "create2 MagicDropImplRegistry START"
-registryByteCode="$(forge inspect contracts/registry/MagicDropTokenImplRegistry.sol:MagicDropTokenImplRegistry bytecode --optimizer-runs 777 --via-ir)"
-
-# Encode the constructor arguments
-constructorArgs=$(cast abi-encode "constructor(address)" $INITIAL_OWNER)
-constructorArgsNoPrefix=${constructorArgs#0x}
-
-# Concatenate the bytecode and constructor arguments
-registryInitCode=$(cast concat-hex $registryByteCode $constructorArgsNoPrefix)
-
-echo "registryInitCode: $registryInitCode"
-
-cast create2 --starts-with 00000000 --case-sensitive --init-code $registryInitCode
-echo "create2 MagicDropImplRegistry END"
-echo "-------------------------------------"
-echo ""

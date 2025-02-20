@@ -2,13 +2,13 @@
 
 set_rpc_url() {
     case $1 in
-        1) RPC_URL="https://eth.llamarpc.com" ;; # Ethereum
-        137) RPC_URL="https://polygon-rpc.com" ;; # Polygon
+        1) RPC_URL="https://eth-mainnet.g.alchemy.com/v2/MfSjHHevbLcIQ2f6ZPUqkT4G79H81qXB" ;; # Ethereum
+        137) RPC_URL="https://polygon-mainnet.g.alchemy.com/v2/MfSjHHevbLcIQ2f6ZPUqkT4G79H81qXB" ;; # Polygon
         8453) RPC_URL="https://mainnet.base.org" ;; # Base
         42161) RPC_URL="https://arb1.arbitrum.io/rpc" ;; # Arbitrum
         1329) RPC_URL="https://evm-rpc.sei-apis.com" ;; # Sei
         33139) RPC_URL="https://rpc.apechain.com/http" ;; # ApeChain
-        56) RPC_URL="https://bsc-dataseed.binance.org" ;; # BSC
+        56) RPC_URL="https://special-dry-tab.bsc.quiknode.pro/38dd1287f7d10af63a661b7538ee754808f205ca" ;; # BSC
         43114) RPC_URL="https://api.avax.network/ext/bc/C/rpc" ;; # Avalanche
         11155111) RPC_URL="https://ethereum-sepolia-rpc.publicnode.com" ;; # Sepolia
         *) echo "Unsupported chain id"; exit 1 ;;

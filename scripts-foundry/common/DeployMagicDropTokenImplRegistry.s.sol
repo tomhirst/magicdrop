@@ -18,18 +18,20 @@ contract DeployMagicDropTokenImplRegistry is Script {
         vm.startBroadcast(privateKey);
         
         // Deploy the implementation contract
-        MagicDropTokenImplRegistry implementation = new MagicDropTokenImplRegistry(address(this));
-        
+        MagicDropTokenImplRegistry implementation = new MagicDropTokenImplRegistry{salt: salt}();
+
+        // Verify the implementation address matches the predicted address
+        if (address(implementation) != expectedAddress) {
+            revert AddressMismatch();
+        }
+
         // Deploy the ERC1967 proxy
         address proxy = LibClone.deployDeterministicERC1967(address(implementation), salt);
 
         // Initialize the proxy with the constructor arguments
         MagicDropTokenImplRegistry(proxy).initialize(initialOwner);
 
-        // Verify the deployed proxy address matches the predicted address
-        if (proxy != expectedAddress) {
-            revert AddressMismatch();
-        }
+        console.log("Proxy deployed:", proxy);
 
         vm.stopBroadcast();
     }

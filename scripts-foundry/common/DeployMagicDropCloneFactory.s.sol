@@ -2,6 +2,7 @@
 pragma solidity ^0.8.22;
 
 import {Script} from "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
 import {MagicDropCloneFactory} from "contracts/factory/MagicDropCloneFactory.sol";
 import {LibClone} from "solady/src/utils/LibClone.sol";
 
@@ -18,18 +19,20 @@ contract DeployMagicDropCloneFactory is Script {
         vm.startBroadcast(privateKey);
         
         // Deploy the implementation contract
-        MagicDropCloneFactory implementation = new MagicDropCloneFactory();
+        MagicDropCloneFactory implementation = new MagicDropCloneFactory{salt: salt}();
+        
+        // Verify the implementation address matches the predicted address
+        if (address(implementation) != expectedAddress) {
+            revert AddressMismatch();
+        }
         
         // Deploy the ERC1967 proxy
         address proxy = LibClone.deployDeterministicERC1967(address(implementation), salt);
 
-        // Initialize the proxy with the constructor arguments
-        MagicDropCloneFactory(proxy).initialize(initialOwner, registry);
+        console.log("Proxy deployed:", proxy);
 
-        // Verify the deployed proxy address matches the predicted address
-        if (proxy != expectedAddress) {
-            revert AddressMismatch();
-        }
+        // Initialize the proxy with the constructor arguments
+        MagicDropCloneFactory(payable(proxy)).initialize(initialOwner, registry);
 
         vm.stopBroadcast();
     }
