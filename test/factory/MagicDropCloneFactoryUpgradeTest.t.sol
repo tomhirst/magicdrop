@@ -10,6 +10,8 @@ import {Initializable} from "solady/src/utils/Initializable.sol";
 import {Ownable} from "solady/src/auth/Ownable.sol";
 import {ERC721MagicDropCloneable} from "../../contracts/nft/erc721m/clones/ERC721MagicDropCloneable.sol";
 import {TokenStandard} from "../../contracts/common/Structs.sol";
+import {MagicDropCloneFactoryV2Test} from "./MagicDropCloneFactoryV2Test.sol";
+import {console} from "forge-std/console.sol";
 
 contract MagicDropCloneFactoryV2 is MagicDropCloneFactory {
     // New storage variable (example)
@@ -180,6 +182,58 @@ contract MagicDropCloneFactoryUpgradeTest is Test {
         assertEq(factoryV3Proxy.getRegistry(), registryProxy);
         assertEq(factoryV3Proxy.getMaxDeploymentFee(), 1 ether);
         assertEq(factoryV3Proxy.version(), "v3");
+    }
+
+    // Test straight implementation upgrade with no contract inheritance.
+    function test_UpgradeToV2Test() public {
+        MagicDropCloneFactory factoryPrxy = MagicDropCloneFactory(payable(factoryProxy));
+
+        // Verify initial state and deploy a collection before upgrade
+        assertEq(factoryPrxy.getRegistry(), registryProxy);
+        address collection = factoryPrxy.createContract("Test", "TEST", TokenStandard.ERC721, payable(owner), 0);
+        assertTrue(collection != address(0));
+
+        // Deploy V2Test
+        MagicDropCloneFactoryV2Test factoryV2Test = new MagicDropCloneFactoryV2Test();
+
+        // Upgrade to V2Test
+        UUPSUpgradeable(factoryProxy).upgradeToAndCall(address(factoryV2Test), "");
+
+        MagicDropCloneFactoryV2Test factoryV2TestProxy = MagicDropCloneFactoryV2Test(payable(factoryProxy));
+
+        // Verify that storage slot 1 is empty
+        //assertEq(factoryV2TestProxy.readStorageSlotAsUint(1), 0);
+        
+        // Test new V2Test functionality
+        factoryV2TestProxy.setMaxDeploymentFee(0.1 ether);
+        assertEq(factoryV2TestProxy.getMaxDeploymentFee(), 0.1 ether);
+
+        // Switch back to original contract
+        factory.upgradeToAndCall(address(factory), "");
+
+        // Verify that storage slot 1 contains new _maxDeploymentFee
+        //assertEq(factoryV2TestProxy.readStorageSlotAsUint(1), 0.1 ether);
+
+        // bytes4 INITIALIZE_SELECTOR = bytes4(keccak256("initialize(string,string,address,uint256)"));
+
+        // // Verify that INITIALIZE_SELECTOR is in slot 50
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(0));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(1));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(2));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(3));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(47));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(48));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(49));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(50));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(51));
+        // console.log(factoryV2TestProxy.readStorageSlotAsUint(52));
+        //assertEq(factoryV2TestProxy.readStorageSlotAsUint(50), INITIALIZE_SELECTOR);
+
+        // Verify old state is preserved and can still deploy collections
+        assertEq(factoryV2TestProxy.getRegistry(), registryProxy);
+        address collectionAfterUpgrade =
+            factoryV2TestProxy.createContract("Test", "TEST", TokenStandard.ERC721, payable(owner), 0);
+        assertTrue(collectionAfterUpgrade != address(0));
     }
 }
 
