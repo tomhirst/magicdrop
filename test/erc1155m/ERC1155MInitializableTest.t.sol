@@ -8,6 +8,7 @@ import {ERC1155MInitializableV1_0_1 as ERC1155MInitializable} from
     "../../contracts/nft/erc1155m/ERC1155MInitializableV1_0_1.sol";
 import {MintStageInfo1155, SetupConfig} from "../../contracts/common/Structs.sol";
 import {ErrorsAndEvents} from "../../contracts/common/ErrorsAndEvents.sol";
+import {LAUNCHPAD_MINT_FEE_RECEIVER} from "../../contracts/utils/Constants.sol";
 
 contract ERC1155MInitializableTest is Test {
     ERC1155MInitializable public nft;
@@ -122,5 +123,50 @@ contract ERC1155MInitializableTest is Test {
         vm.startPrank(owner);
         vm.expectRevert(ErrorsAndEvents.TransferableAlreadySet.selector);
         nft.setTransferable(true);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testMintFee() public {
+        MintStageInfo1155[] memory stages = new MintStageInfo1155[](1);
+
+        uint80[] memory price = new uint80[](1);
+        price[0] = 0.5 ether;
+        uint32[] memory walletLimit = new uint32[](1);
+        walletLimit[0] = 1;
+        bytes32[] memory merkleRoot = new bytes32[](1);
+        merkleRoot[0] = bytes32(0);
+        uint24[] memory maxStageSupply = new uint24[](1);
+        maxStageSupply[0] = 5;
+        uint80[] memory mintFee = new uint80[](1);
+        mintFee[0] = 0.1 ether;
+
+        stages[0] = MintStageInfo1155({
+            price: price,
+            walletLimit: walletLimit,
+            merkleRoot: merkleRoot,
+            maxStageSupply: maxStageSupply,
+            startTimeUnixSeconds: 0,
+            endTimeUnixSeconds: 1,
+            mintFee: mintFee
+        });
+
+        nft.setStages(stages);
+
+        vm.warp(0);
+        vm.prank(minter);
+        vm.deal(minter, 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(ErrorsAndEvents.NotEnoughValue.selector));
+        nft.mint{value: 0.5 ether}(0, 1, 0, new bytes32[](0));
+        assertEq(nft.balanceOf(minter, 0), 0);
+
+        vm.prank(minter);
+        nft.mint{value: 0.5 ether + 0.1 ether}(0, 1, 1, new bytes32[](0));
+        assertEq(nft.balanceOf(minter, 0), 1);
+
+        vm.prank(owner);
+        nft.withdraw();
+        assertEq(fundReceiver.balance, 0.5 ether);
+        assertEq(LAUNCHPAD_MINT_FEE_RECEIVER.balance, 0.1 ether);
     }
 }

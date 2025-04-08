@@ -9,6 +9,7 @@ import {ERC721CMInitializableV1_0_1 as ERC721CMInitializable} from
 import {IERC721MInitializable} from "../../contracts/nft/erc721m/interfaces/IERC721MInitializable.sol";
 import {MintStageInfo, SetupConfig} from "../../contracts/common/Structs.sol";
 import {ErrorsAndEvents} from "../../contracts/common/ErrorsAndEvents.sol";
+import {LAUNCHPAD_MINT_FEE_RECEIVER} from "../../contracts/utils/Constants.sol";
 
 contract MockERC721CMInitializable is ERC721CMInitializable {
     function baseURI() public view returns (string memory) {
@@ -111,6 +112,35 @@ contract ERC721CMInitializableTest is Test {
         vm.prank(readonly);
         vm.expectRevert();
         nft.withdraw();
+    }
+
+    function testMintFee() public {
+        MintStageInfo[] memory stages = new MintStageInfo[](1);
+        stages[0] = MintStageInfo({
+            price: 0.5 ether,
+            walletLimit: 10,
+            merkleRoot: bytes32(0),
+            maxStageSupply: 5,
+            startTimeUnixSeconds: 0,
+            endTimeUnixSeconds: 1,
+            mintFee: 0.1 ether
+        });
+        nft.setStages(stages);
+
+        vm.warp(0);
+        vm.prank(minter);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsAndEvents.NotEnoughValue.selector));
+        nft.mint{value: 0.5 ether}(1, 0, new bytes32[](0), 0, "");
+        assertEq(nft.balanceOf(minter), 0);
+
+        vm.prank(minter);
+        nft.mint{value: 0.5 ether + 0.1 ether}(1, 0, new bytes32[](0), 0, "");
+        assertEq(nft.balanceOf(minter), 1);
+
+        vm.prank(owner);
+        nft.withdraw();
+        assertEq(fundReceiver.balance, 0.5 ether);
+        assertEq(LAUNCHPAD_MINT_FEE_RECEIVER.balance, 0.1 ether);
     }
 
     function testSetStages() public {
