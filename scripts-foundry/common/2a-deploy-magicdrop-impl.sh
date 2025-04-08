@@ -42,7 +42,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Check if all parameters are set
-if [ -z "$CHAIN_ID" ] || [ -z "$STANDARD" ] || [ -z "$IMPL_EXPECTED_ADDRESS" ] || [ -z "$IMPL_SALT" ]; then
+if [ -z "$CHAIN_ID" ] || [ -z "$STANDARD" ] || [ -z "$IMPL_SALT" ]; then
     usage
 fi
 
@@ -85,7 +85,14 @@ CHAIN_ID=$CHAIN_ID RPC_URL=$RPC_URL TOKEN_STANDARD=$STANDARD IMPL_EXPECTED_ADDRE
   --optimizer-runs 777 \
   --via-ir \
   --verify \
-  -v
+  -v \
+  --zksync \
+  --zk-compile 1.5.7 \
+  --evm-version cancun \
+  --compiler-version 0.8.24 \
+  --verifier etherscan \
+  --verifier-url 'https://api.abscan.org/api' \
+  --skip-simulation
 
 echo ""
 echo "============= DEPLOYED MAGICDROP IMPLEMENTATION ============="
